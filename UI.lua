@@ -117,8 +117,8 @@ local function enumItem(enumType, name, fallback)
 	return fallback
 end
 local FONT = enumItem(Enum.Font, "BuilderSans", Enum.Font.Gotham)
-local FONT_MEDIUM = enumItem(Enum.Font, "BuilderSansMedium", FONT) -- labels and the loading screen's small text
 local FONT_BOLD = enumItem(Enum.Font, "BuilderSansBold", Enum.Font.GothamBold)
+local FONT_LABEL = enumItem(Enum.Font, "BuilderSansExtraBold", FONT_BOLD) -- labels and the loading screen's small text
 local PLACEHOLDER_ICON = "rbxasset://textures/ui/GuiImagePlaceholder.png"
 local WHITE = Color3.new(1, 1, 1)
 
@@ -913,7 +913,7 @@ function Groupbox:AddLabel(a, b, c)
 	end
 	local e = newElement(idx, "Label")
 	local row = self:_row(24, text, "TextLabel", {
-		Text = text, TextSize = 15, TextColor3 = Theme.Dim, Font = FONT_MEDIUM, TextXAlignment = LEFT,
+		Text = text, TextSize = 15, TextColor3 = Theme.Dim, Font = FONT_LABEL, TextXAlignment = LEFT,
 		TextWrapped = wrap, AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
 	})
 	new("UIPadding", {PaddingLeft = UDim.new(0, 4)}, row)
@@ -1996,7 +1996,7 @@ function Window:_createLoadingScreen(g, opts, cfg)
 		TextXAlignment = CENTER, Position = UDim2.new(0, 0, 0, 94), Size = UDim2.new(1, 0, 0, 30),
 	})
 	local status = label(card, {
-		Name = "Status", Text = self._loadStatus, Font = FONT_MEDIUM, TextSize = 15, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
+		Name = "Status", Text = self._loadStatus, Font = FONT_LABEL, TextSize = 15, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
 		TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.new(0, 20, 0, 128), Size = UDim2.new(1, -40, 0, 22),
 	})
 	local track = new("Frame", {
