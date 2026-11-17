@@ -845,7 +845,7 @@ function Groupbox:AddButton(cfg, func)
 	local row = self:_row(44, cfg.Text)
 	local btn = new("TextButton", {
 		Name = "Button", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Theme.Button, BorderSizePixel = 0,
-		Text = cfg.Text or "Button", TextColor3 = Theme.Text, TextSize = 17, Font = FONT, AutoButtonColor = false,
+		Text = cfg.Text or "Button", TextColor3 = Theme.Text, TextSize = 17, Font = FONT_LABEL, AutoButtonColor = false,
 	}, row)
 	corner(btn, 12)
 	hairline(btn, 0.9)
