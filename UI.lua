@@ -14,7 +14,7 @@
 	Library:CreateWindow({
 		Title = "Neptune",                 -- header title
 		Footer = "version: example",       -- small text bottom right (optional)
-		Accent = Color3.fromRGB(95,215,152),
+		Accent = Color3.fromRGB(56,160,255),   -- optional; the default accent is blue
 		ToggleKey = Enum.KeyCode.RightShift,
 		IconTint = true,                   -- false keeps your icons' own colours
 		NotifySide = "Right",              -- "Left" | "Right"
@@ -92,7 +92,7 @@ local Library = {
 	ConfigFolder = "NeptuneUI",
 	ConfigIgnore = {},
 	Theme = {
-		Accent = Color3.fromRGB(95, 215, 152),
+		Accent = Color3.fromRGB(56, 160, 255), -- blue; the base accent unless a window / Library:SetAccent changes it
 		Background = Color3.fromRGB(11, 11, 12),
 		Card = Color3.fromRGB(20, 20, 22),
 		Inset = Color3.fromRGB(9, 9, 10),
