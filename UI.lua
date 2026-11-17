@@ -45,7 +45,9 @@
 	Window:FinishLoading()                 close the loading screen and show the window; waits for the minimum time and for tab icons
 
 	TAB
-	Tab:AddGroupbox({Name=, Collapsed=false, DisableCollapsing=false}) -> Groupbox
+	Tab:AddGroupbox({Name=, Icon=, IconColor=, Collapsed=false, DisableCollapsing=false}) -> Groupbox
+	                                       Icon = a Lucide name ("toggle-right"), an asset id, or a list of those (same as tab icons);
+	                                       it is drawn before the title. IconColor defaults to the accent.
 	                                       groupboxes stack in one full-width column, in the order you add them
 	                                       (a Side option is accepted but ignored; AddLeftGroupbox / AddRightGroupbox are the same thing)
 	Tab:AddLeftGroupbox(name)  Tab:AddRightGroupbox(name)
@@ -65,7 +67,7 @@
 	                            FormatDisplayValue=function(value) -> string, Callback=})
 	Groupbox:AddKeybind(idx, {Text=, Default="E"|Enum.KeyCode.E|"MB2", Mode="Toggle"|"Hold"|"Press"|"Always",
 	                           Callback=function(state), ChangedCallback=function(key)})
-	Groupbox:SetCollapsed(bool)
+	Groupbox:SetCollapsed(bool)  Groupbox:SetIcon(icon)   (nil removes the icon)
 
 	ELEMENTS
 	el.Value   el:SetValue(v)   el:OnChanged(function(value) end)   el:SetText(t)   el:SetVisible(b)
@@ -425,7 +427,9 @@ local function applyIcon(tab, icon)
 	tab._iconToken = (tab._iconToken or 0) + 1
 	local token = tab._iconToken
 	local logo, glyph = tab.Logo, tab.Glyph
-	glyph.Visible = false
+	if glyph then
+		glyph.Visible = false
+	end
 	logo.Visible = true
 
 	local list = {}
@@ -435,7 +439,11 @@ local function applyIcon(tab, icon)
 		list = {icon}
 	end
 	if #list == 0 then
-		showImage(logo, PLACEHOLDER_ICON)
+		if tab.Kind == "groupbox" then
+			logo.Visible = false
+		else
+			showImage(logo, PLACEHOLDER_ICON)
+		end
 		return
 	end
 	showImage(logo, "")
@@ -477,8 +485,13 @@ local function applyIcon(tab, icon)
 			return
 		end
 		logo.Visible = false
-		glyph.Visible = true
-		warn("[Neptune] icon for tab '" .. tostring(tab.Name) .. "' did not load: " .. tostring(lastError))
+		if glyph then
+			glyph.Visible = true
+		end
+		if tab._onIconFail then
+			tab._onIconFail()
+		end
+		warn("[Neptune] icon for " .. (tab.Kind or "tab") .. " '" .. tostring(tab.Name) .. "' did not load: " .. tostring(lastError))
 	end
 
 	-- counted, so the loading screen can wait for the tab icons
@@ -487,7 +500,7 @@ local function applyIcon(tab, icon)
 		local ok, err = pcall(resolve)
 		window._pendingIcons = window._pendingIcons - 1
 		if not ok then
-			warn("[Neptune] icon error for tab '" .. tostring(tab.Name) .. "': " .. tostring(err))
+			warn("[Neptune] icon error for " .. (tab.Kind or "tab") .. " '" .. tostring(tab.Name) .. "': " .. tostring(err))
 		end
 	end)
 end
@@ -768,6 +781,24 @@ local function rowTitle(row, text, props)
 		p[k] = v
 	end
 	return label(row, p)
+end
+
+-- moves the title to make room for the icon (or back)
+function Groupbox:_layoutTitle(hasIcon)
+	self.TitleLabel.Position = hasIcon and UDim2.new(0, 40, 0, 0) or UDim2.new(0, 14, 0, 0)
+	self.TitleLabel.Size = hasIcon and UDim2.new(1, -74, 1, 0) or UDim2.new(1, -48, 1, 0)
+end
+
+-- Groupbox:SetIcon("toggle-right")  a Lucide name, an asset id, or a list of those; nil removes the icon
+function Groupbox:SetIcon(icon)
+	local hasIcon = icon ~= nil and not (type(icon) == "table" and #icon == 0)
+	self:_layoutTitle(hasIcon)
+	if not hasIcon then
+		self._iconToken = (self._iconToken or 0) + 1
+		self.Logo.Visible = false
+		return
+	end
+	applyIcon(self, icon)
 end
 
 function Groupbox:SetCollapsed(collapsed)
@@ -1606,10 +1637,21 @@ function Tab:AddGroupbox(cfg)
 	new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, card)
 
 	local head = new("Frame", {Name = "Header", Size = UDim2.new(1, 0, 0, 38), BackgroundTransparency = 1, LayoutOrder = 0}, card)
-	label(head, {
+	local titleLabel = label(head, {
 		Name = "Title", Text = cfg.Name or "Groupbox", Font = FONT_BOLD, TextSize = 16,
 		Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(1, -48, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd,
 	})
+	local iconImage = new("ImageLabel", {
+		Name = "Icon", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0), Size = UDim2.fromOffset(18, 18),
+		BackgroundTransparency = 1, Image = "", ImageColor3 = cfg.IconColor or Theme.Accent, ScaleType = Enum.ScaleType.Fit, Visible = false,
+	}, head)
+	if not cfg.IconColor then
+		onAccent(function(color)
+			if iconImage.Parent then
+				iconImage.ImageColor3 = color
+			end
+		end)
+	end
 	local chevron = label(head, {
 		Name = "Chevron", Text = "▼", TextSize = 10, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
 		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -20, 0.5, 0), Size = UDim2.fromOffset(16, 16),
@@ -1629,7 +1671,13 @@ function Tab:AddGroupbox(cfg)
 		PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 8),
 	}, body)
 
-	local gb = setmetatable({Tab = self, Frame = card, Body = body, Chevron = chevron, _order = 0, _collapsed = false}, Groupbox)
+	local gb = setmetatable({
+		Tab = self, Window = self.Window, Frame = card, Body = body, Chevron = chevron, _order = 0, _collapsed = false,
+		Name = cfg.Name or "Groupbox", Kind = "groupbox", Logo = iconImage, TitleLabel = titleLabel,
+	}, Groupbox)
+	gb._onIconFail = function()
+		gb:_layoutTitle(false) -- the icon did not load: give the space back to the title
+	end
 	if cfg.DisableCollapsing then
 		gb._noCollapse = true
 		chevron.Visible = false
@@ -1643,6 +1691,9 @@ function Tab:AddGroupbox(cfg)
 		gb:SetCollapsed(true)
 	end
 	table.insert(self.Groupboxes, gb)
+	if cfg.Icon ~= nil then
+		gb:SetIcon(cfg.Icon)
+	end
 	return gb
 end
 
