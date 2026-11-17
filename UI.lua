@@ -45,7 +45,9 @@
 	Window:FinishLoading()                 close the loading screen and show the window; waits for the minimum time and for tab icons
 
 	TAB
-	Tab:AddGroupbox({Name=, Side="Left"|"Right", Collapsed=false, DisableCollapsing=false}) -> Groupbox
+	Tab:AddGroupbox({Name=, Collapsed=false, DisableCollapsing=false}) -> Groupbox
+	                                       groupboxes stack in one full-width column, in the order you add them
+	                                       (a Side option is accepted but ignored; AddLeftGroupbox / AddRightGroupbox are the same thing)
 	Tab:AddLeftGroupbox(name)  Tab:AddRightGroupbox(name)
 	Tab:SetIcon(icon)  Tab:Rename(name)         (SetIcon takes the same values as AddTab's icon)
 
@@ -1592,21 +1594,8 @@ function Tab:AddGroupbox(cfg)
 		cfg = {Name = cfg}
 	end
 	cfg = cfg or {}
-	local side = string.lower(tostring(cfg.Side or ""))
-	local column
-	if side == "left" then
-		column = self.Left
-	elseif side == "right" then
-		column = self.Right
-	else
-		if self._next == 2 then
-			column = self.Right
-			self._next = 1
-		else
-			column = self.Left
-			self._next = 2
-		end
-	end
+	-- one column: groupboxes stack under each other in the order they are added (cfg.Side is accepted but ignored)
+	local column = self.Left
 
 	local card = new("Frame", {
 		Name = "Groupbox", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
@@ -1791,19 +1780,13 @@ function Window:AddTab(name, icon)
 		ScrollBarImageColor3 = Theme.HexLine, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false,
 	}, self._content)
 	new("UIPadding", {PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 6)}, page)
-	local columns = new("Frame", {Name = "Columns", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1}, page)
-	new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder}, columns)
-	local function makeColumn(colName, order)
-		local c = new("Frame", {
-			Name = colName, Size = UDim2.new(0.5, -6, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order,
-		}, columns)
-		new("UIListLayout", {Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder}, c)
-		return c
-	end
+	-- a single full-width column; the groupboxes stack inside it
+	local column = new("Frame", {Name = "Column", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1}, page)
+	new("UIListLayout", {Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder}, column)
 
 	local tab = setmetatable({
 		Window = self, Name = name, Hex = hex, Outline = outline, Fill = fill, Logo = logo, Glyph = glyph, Page = page,
-		Left = makeColumn("Left", 1), Right = makeColumn("Right", 2), Groupboxes = {}, _next = 1,
+		Left = column, Right = column, Groupboxes = {},
 	}, Tab)
 	table.insert(self.Tabs, tab)
 	self.TabMap[name] = tab
