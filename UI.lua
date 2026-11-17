@@ -18,6 +18,8 @@
 		ToggleKey = Enum.KeyCode.RightShift,
 		IconTint = true,                   -- false keeps your icons' own colours
 		NotifySide = "Right",              -- "Left" | "Right"
+		LoadingScreen = true,              -- hide the window behind a loading screen until Window:FinishLoading()
+		                                   -- (or a table: {Title=, Subtitle=, MinTime=1.2, Timeout=25})
 	}) -> Window
 
 	Library.Options / Library.Toggles      elements by their index (see below)
@@ -39,6 +41,8 @@
 	Library:GetIcon("name") -> icon table or nil, reason
 	Window:SelectTab(nameOrTab)  Window:SetTitle(text)  Window:SetIconTint(bool)
 	Window:Toggle([visible])  Window:Minimize([state])
+	Window:SetLoading("text", 0-1)         update the loading screen's status / progress (optional, yields one frame)
+	Window:FinishLoading()                 close the loading screen and show the window; waits for the minimum time and for tab icons
 
 	TAB
 	Tab:AddGroupbox({Name=, Side="Left"|"Right", Collapsed=false, DisableCollapsing=false}) -> Groupbox
@@ -433,7 +437,9 @@ local function applyIcon(tab, icon)
 	end
 	showImage(logo, "")
 
-	task.spawn(function()
+	local window = tab.Window
+
+	local function resolve()
 		local lastError = "no usable icon given"
 		for _, candidate in ipairs(list) do
 			if tab._iconToken ~= token or not logo.Parent then
@@ -470,6 +476,16 @@ local function applyIcon(tab, icon)
 		logo.Visible = false
 		glyph.Visible = true
 		warn("[Neptune] icon for tab '" .. tostring(tab.Name) .. "' did not load: " .. tostring(lastError))
+	end
+
+	-- counted, so the loading screen can wait for the tab icons
+	task.spawn(function()
+		window._pendingIcons = (window._pendingIcons or 0) + 1
+		local ok, err = pcall(resolve)
+		window._pendingIcons = window._pendingIcons - 1
+		if not ok then
+			warn("[Neptune] icon error for tab '" .. tostring(tab.Name) .. "': " .. tostring(err))
+		end
 	end)
 end
 
@@ -725,6 +741,11 @@ Groupbox.__index = Groupbox
 
 function Groupbox:_row(height, searchText, class, props)
 	self._order = self._order + 1
+	local window = self.Tab and self.Tab.Window
+	if window then
+		window._features = window._features + 1
+		window:_featureAdded()
+	end
 	local p = {
 		Name = "Row", Size = UDim2.new(1, 0, 0, height), BackgroundColor3 = WHITE,
 		BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = self._order,
@@ -1823,6 +1844,9 @@ function Window:SetIconTint(state)
 end
 
 function Window:Toggle(state)
+	if self._loading then
+		return
+	end
 	local main = self.Main
 	if state == nil then
 		state = not main.Visible
@@ -1860,6 +1884,152 @@ function Window:Destroy()
 	Library:Unload()
 end
 
+----------------------------------------------------------------------- loading screen
+
+function Window:_refreshLoadingText()
+	local ld = self._loading
+	if not ld or not ld.Card.Parent then
+		return
+	end
+	local text = self._loadStatus or "Loading features..."
+	if self._features > 0 then
+		text = text .. "  ·  " .. self._features .. " features"
+	end
+	ld.Status.Text = text
+end
+
+-- called for every element that gets added while the loading screen is up
+function Window:_featureAdded()
+	local ld = self._loading
+	if not ld then
+		return
+	end
+	if not self._manualProgress then
+		-- no explicit progress given: creep towards 100% as features appear
+		local fraction = 1 - 1 / (1 + self._features / 20)
+		ld.Fill.Size = UDim2.new(fraction, 0, 1, 0)
+	end
+	self:_refreshLoadingText()
+end
+
+-- Window:SetLoading("Building the Main tab...", 0.3)   text and progress (0 to 1) are both optional.
+-- It also yields for one frame so the loading screen gets drawn between your steps.
+function Window:SetLoading(text, fraction)
+	local ld = self._loading
+	if not ld then
+		return
+	end
+	if text then
+		self._loadStatus = text
+	end
+	if fraction then
+		self._manualProgress = true
+		tween(ld.Fill, {Size = UDim2.new(math.clamp(fraction, 0, 1), 0, 1, 0)}, 0.25)
+	end
+	self:_refreshLoadingText()
+	task.wait()
+end
+
+-- Window:FinishLoading() hides the loading screen and shows the window. Call it after everything is added.
+-- It waits for the minimum display time and for the tab icons to finish loading first.
+function Window:FinishLoading()
+	local ld = self._loading
+	if not ld or ld.finishing then
+		return
+	end
+	ld.finishing = true
+	self._loadStatus = "Finishing up..."
+	self:_refreshLoadingText()
+
+	local iconDeadline = os.clock() + 12
+	while ld.Card.Parent and ((os.clock() < self._loadingStart + self._loadingMin) or (self._pendingIcons > 0 and os.clock() < iconDeadline)) do
+		task.wait(0.05)
+	end
+	if not ld.Card.Parent then
+		self._loading = nil
+		return
+	end
+
+	tween(ld.Fill, {Size = UDim2.new(1, 0, 1, 0)}, 0.2)
+	task.wait(0.25)
+	tween(ld.Card, {GroupTransparency = 1}, 0.25)
+	task.wait(0.3)
+	if ld.Spin then
+		ld.Spin:Cancel()
+	end
+	ld.Card:Destroy()
+	self._loading = nil
+	self:Toggle(true)
+end
+
+function Window:_createLoadingScreen(g, opts, cfg)
+	self.Main.Visible = false
+	self._loadingStart = os.clock()
+	self._loadingMin = opts.MinTime or 1.2
+	self._loadStatus = opts.Subtitle or "Loading features..."
+
+	local card = new("CanvasGroup", {
+		Name = "LoadingScreen", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(380, 214), BackgroundColor3 = Theme.Background, BorderSizePixel = 0,
+		GroupTransparency = 1, ZIndex = 100,
+	}, g)
+	corner(card, 18)
+	hairline(card, 0.88)
+
+	-- a spinning hexagon, to match the tabs
+	local spin = new("Frame", {
+		Name = "Spinner", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 22),
+		Size = UDim2.fromOffset(52, 60), BackgroundTransparency = 1,
+	}, card)
+	local spinOutline = hexLayer(spin, "Outline", Theme.Accent, 1, 1)
+	hexLayer(spin, "Fill", Theme.Background, 0.78, 2)
+	local spinTween = TweenService:Create(
+		spin,
+		TweenInfo.new(1.8, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, -1),
+		{Rotation = 360}
+	)
+	spinTween:Play()
+
+	local title = label(card, {
+		Name = "Title", Text = opts.Title or cfg.Title or "Neptune", Font = FONT_BOLD, TextSize = 24, TextColor3 = Theme.Accent,
+		TextXAlignment = CENTER, Position = UDim2.new(0, 0, 0, 94), Size = UDim2.new(1, 0, 0, 30),
+	})
+	local status = label(card, {
+		Name = "Status", Text = self._loadStatus, TextSize = 15, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
+		TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.new(0, 20, 0, 128), Size = UDim2.new(1, -40, 0, 22),
+	})
+	local track = new("Frame", {
+		Name = "Track", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 166), Size = UDim2.fromOffset(300, 6),
+		BackgroundColor3 = Theme.Track, BorderSizePixel = 0,
+	}, card)
+	corner(track, UDim.new(1, 0))
+	local fill = new("Frame", {Name = "Fill", Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0}, track)
+	corner(fill, UDim.new(1, 0))
+
+	self._loading = {Card = card, Fill = fill, Status = status, Spin = spinTween}
+	tween(card, {GroupTransparency = 0}, 0.25)
+
+	onAccent(function(color)
+		if card.Parent then
+			title.TextColor3 = color
+			fill.BackgroundColor3 = color
+			for _, band in ipairs(spinOutline:GetChildren()) do
+				if band:IsA("Frame") then
+					band.BackgroundColor3 = color
+				end
+			end
+		end
+	end)
+
+	-- safety net: if FinishLoading is never called, show the window anyway
+	task.delay(opts.Timeout or 25, function()
+		if self._loading and not self._loading.finishing then
+			warn("[Neptune] Window:FinishLoading() was not called, showing the window anyway")
+			self:FinishLoading()
+		end
+	end)
+end
+
 function Library:CreateWindow(cfg)
 	cfg = cfg or {}
 	if self.Window then
@@ -1875,7 +2045,7 @@ function Library:CreateWindow(cfg)
 	end
 
 	local w = setmetatable({
-		Tabs = {}, TabMap = {}, Minimized = false, IconTint = cfg.IconTint ~= false,
+		Tabs = {}, TabMap = {}, Minimized = false, IconTint = cfg.IconTint ~= false, _features = 0, _pendingIcons = 0,
 		ToggleKey = cfg.ToggleKey or Enum.KeyCode.RightShift,
 	}, Window)
 	self.Window = w
@@ -2024,6 +2194,10 @@ function Library:CreateWindow(cfg)
 			w:Toggle()
 		end
 	end)
+
+	if cfg.LoadingScreen then
+		w:_createLoadingScreen(g, type(cfg.LoadingScreen) == "table" and cfg.LoadingScreen or {}, cfg)
+	end
 
 	return w
 end
