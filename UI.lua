@@ -95,8 +95,18 @@ local Library = {
 }
 local Theme = Library.Theme
 
-local FONT = Enum.Font.BuilderSans
-local FONT_BOLD = Enum.Font.BuilderSansBold
+-- BuilderSans on current clients, Gotham if the enum item does not exist (older clients would otherwise error here)
+local function enumItem(enumType, name, fallback)
+	local ok, item = pcall(function()
+		return enumType[name]
+	end)
+	if ok and item then
+		return item
+	end
+	return fallback
+end
+local FONT = enumItem(Enum.Font, "BuilderSans", Enum.Font.Gotham)
+local FONT_BOLD = enumItem(Enum.Font, "BuilderSansBold", Enum.Font.GothamBold)
 local PLACEHOLDER_ICON = "rbxasset://textures/ui/GuiImagePlaceholder.png"
 local WHITE = Color3.new(1, 1, 1)
 
@@ -205,37 +215,59 @@ function Library:SetAccent(color)
 	end
 end
 
-local function resolveParent()
+-- places the UI can live, best first: gethui() container, CoreGui, PlayerGui
+local function parentCandidates()
+	local list = {}
+	local cleanup = {}
+	local function add(inst)
+		if inst and not table.find(list, inst) then
+			table.insert(list, inst)
+		end
+	end
 	if typeof(gethui) == "function" then
 		local ok, ui = pcall(gethui)
 		if ok and typeof(ui) == "Instance" then
-			return ui
+			table.insert(cleanup, ui)
+			-- Some executors (e.g. Potassium) return RobloxGui, which is itself a ScreenGui.
+			-- A ScreenGui parented inside another ScreenGui never renders, so use its parent (CoreGui) instead.
+			if ui:IsA("LayerCollector") then
+				add(ui.Parent)
+			else
+				add(ui)
+			end
 		end
 	end
-	local ok, core = pcall(function()
+	local okCore, core = pcall(function()
 		return game:GetService("CoreGui")
 	end)
-	if ok and core then
-		local probe = Instance.new("Folder")
-		local canParent = pcall(function()
-			probe.Parent = core
-		end)
-		probe:Destroy()
-		if canParent then
-			return core
-		end
+	if okCore and core then
+		add(core)
 	end
-	return LocalPlayer:WaitForChild("PlayerGui")
+	local okPg, pg = pcall(function()
+		return LocalPlayer:WaitForChild("PlayerGui", 5)
+	end)
+	if okPg and pg then
+		add(pg)
+	end
+	return list, cleanup
 end
 
 local function ensureGui()
 	if gui and gui.Parent then
 		return gui
 	end
-	local parent = resolveParent()
-	local old = parent:FindFirstChild("NeptuneUI")
-	if old then
-		old:Destroy()
+	local candidates, cleanup = parentCandidates()
+	for _, parent in ipairs(candidates) do
+		table.insert(cleanup, parent)
+	end
+	-- remove copies left behind by earlier runs
+	for _, parent in ipairs(cleanup) do
+		pcall(function()
+			local old = parent:FindFirstChild("NeptuneUI")
+			if old then
+				old:Destroy()
+			end
+		end)
 	end
 	gui = new("ScreenGui", {
 		Name = "NeptuneUI",
@@ -243,8 +275,24 @@ local function ensureGui()
 		IgnoreGuiInset = true,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = 100,
+		Enabled = true,
 	})
-	gui.Parent = parent
+	-- use the first place that actually accepts the GUI (some executors silently refuse CoreGui / gethui)
+	local placed = nil
+	for _, parent in ipairs(candidates) do
+		local ok = pcall(function()
+			gui.Parent = parent
+		end)
+		if ok and gui.Parent == parent then
+			placed = parent
+			break
+		end
+	end
+	if not placed then
+		warn("[Neptune] could not place the UI anywhere (gethui / CoreGui / PlayerGui all refused it)")
+	else
+		print("[Neptune] UI created in " .. tostring(placed.Name))
+	end
 	return gui
 end
 
