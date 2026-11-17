@@ -757,13 +757,13 @@ function Groupbox:_row(height, searchText, class, props)
 		p[k] = v
 	end
 	local row = new(class or "Frame", p, self.Body)
-	corner(row, 10)
+	corner(row, 8)
 	row:SetAttribute("Search", string.lower(searchText or ""))
 	return row
 end
 
 local function rowTitle(row, text, props)
-	local p = {Name = "Title", Text = text or "", Font = FONT_LABEL, TextSize = 17, Position = UDim2.new(0, 4, 0, 0), Size = UDim2.new(1, -70, 1, 0)}
+	local p = {Name = "Title", Text = text or "", Font = FONT_LABEL, TextSize = 15, Position = UDim2.new(0, 4, 0, 0), Size = UDim2.new(1, -56, 1, 0)}
 	for k, v in pairs(props or {}) do
 		p[k] = v
 	end
@@ -786,17 +786,17 @@ function Groupbox:AddToggle(idx, cfg)
 	local value = cfg.Default == true
 	e.Value = value
 
-	local row = self:_row(44, cfg.Text)
+	local row = self:_row(34, cfg.Text)
 	local title = rowTitle(row, cfg.Text or "Toggle")
 	local sw = new("Frame", {
 		Name = "Switch", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -4, 0.5, 0),
-		Size = UDim2.fromOffset(50, 28), BackgroundColor3 = Theme.SwitchOff, BorderSizePixel = 0,
+		Size = UDim2.fromOffset(40, 22), BackgroundColor3 = Theme.SwitchOff, BorderSizePixel = 0,
 	}, row)
 	corner(sw, UDim.new(1, 0))
 	hairline(sw, 0.88)
 	local knob = new("Frame", {
 		Name = "Knob", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 3, 0.5, 0),
-		Size = UDim2.fromOffset(22, 22), BackgroundColor3 = WHITE, BorderSizePixel = 0,
+		Size = UDim2.fromOffset(16, 16), BackgroundColor3 = WHITE, BorderSizePixel = 0,
 	}, sw)
 	corner(knob, UDim.new(1, 0))
 	local hit = hitButton(row)
@@ -804,7 +804,7 @@ function Groupbox:AddToggle(idx, cfg)
 
 	local function render(animate)
 		local color = value and Theme.Accent or Theme.SwitchOff
-		local pos = value and UDim2.new(1, -25, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
+		local pos = value and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
 		if animate then
 			tween(sw, {BackgroundColor3 = color})
 			tween(knob, {Position = pos})
@@ -844,12 +844,12 @@ function Groupbox:AddButton(cfg, func)
 	end
 	cfg = cfg or {}
 	local e = newElement(nil, "Button")
-	local row = self:_row(44, cfg.Text)
+	local row = self:_row(34, cfg.Text)
 	local btn = new("TextButton", {
 		Name = "Button", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Theme.Button, BorderSizePixel = 0,
-		Text = cfg.Text or "Button", TextColor3 = Theme.Text, TextSize = 17, Font = FONT_LABEL, AutoButtonColor = false,
+		Text = cfg.Text or "Button", TextColor3 = Theme.Text, TextSize = 15, Font = FONT_LABEL, AutoButtonColor = false,
 	}, row)
-	corner(btn, 12)
+	corner(btn, 10)
 	hairline(btn, 0.9)
 
 	local base = Theme.Button
@@ -914,8 +914,8 @@ function Groupbox:AddLabel(a, b, c)
 		text, wrap, idx = a, b == true, c
 	end
 	local e = newElement(idx, "Label")
-	local row = self:_row(24, text, "TextLabel", {
-		Text = text, TextSize = 15, TextColor3 = Theme.Dim, Font = FONT_LABEL, TextXAlignment = LEFT,
+	local row = self:_row(20, text, "TextLabel", {
+		Text = text, TextSize = 14, TextColor3 = Theme.Dim, Font = FONT_LABEL, TextXAlignment = LEFT,
 		TextWrapped = wrap, AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
 	})
 	new("UIPadding", {PaddingLeft = UDim.new(0, 4)}, row)
@@ -931,7 +931,7 @@ function Groupbox:AddLabel(a, b, c)
 end
 
 function Groupbox:AddDivider()
-	local row = self:_row(9, "")
+	local row = self:_row(7, "")
 	new("Frame", {
 		Name = "Line", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(1, 0, 0, 1),
 		BackgroundColor3 = WHITE, BackgroundTransparency = 0.93, BorderSizePixel = 0,
@@ -957,15 +957,15 @@ function Groupbox:AddSlider(idx, cfg)
 	e.Value = value
 	e.Min, e.Max = min, max
 
-	local row = self:_row(62, cfg.Text)
-	local title = rowTitle(row, cfg.Text or "Slider", {Position = UDim2.new(0, 4, 0, 6), Size = UDim2.new(1, -100, 0, 24)})
+	local row = self:_row(50, cfg.Text)
+	local title = rowTitle(row, cfg.Text or "Slider", {Position = UDim2.new(0, 4, 0, 4), Size = UDim2.new(1, -90, 0, 20)})
 	title.Visible = cfg.Compact ~= true
 	local valueLabel = label(row, {
-		Name = "ValueLabel", TextSize = 16, TextColor3 = Theme.Dim, TextXAlignment = RIGHT,
-		AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -4, 0, 6), Size = UDim2.fromOffset(94, 24),
+		Name = "ValueLabel", TextSize = 14, TextColor3 = Theme.Dim, TextXAlignment = RIGHT,
+		AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -4, 0, 4), Size = UDim2.fromOffset(80, 20),
 	})
 	local track = new("Frame", {
-		Name = "Track", Position = UDim2.new(0, 4, 0, 42), Size = UDim2.new(1, -8, 0, 8),
+		Name = "Track", Position = UDim2.new(0, 4, 0, 33), Size = UDim2.new(1, -8, 0, 6),
 		BackgroundColor3 = Theme.Track, BorderSizePixel = 0,
 	}, row)
 	corner(track, UDim.new(1, 0))
@@ -973,10 +973,10 @@ function Groupbox:AddSlider(idx, cfg)
 	corner(fill, UDim.new(1, 0))
 	local knob = new("Frame", {
 		Name = "Knob", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(20, 20), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 2,
+		Size = UDim2.fromOffset(16, 16), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 2,
 	}, track)
 	corner(knob, UDim.new(1, 0))
-	local hit = hitButton(row, {Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 1, -30)})
+	local hit = hitButton(row, {Position = UDim2.new(0, 0, 0, 24), Size = UDim2.new(1, 0, 1, -24)})
 	hoverFx(hit, row)
 
 	local function display()
@@ -1041,16 +1041,16 @@ function Groupbox:AddInput(idx, cfg)
 	e.Callback = cfg.Callback
 	e.Value = tostring(cfg.Default or "")
 
-	local row = self:_row(70, cfg.Text)
-	local title = rowTitle(row, cfg.Text or "Input", {Position = UDim2.new(0, 4, 0, 4), Size = UDim2.new(1, -8, 0, 22)})
+	local row = self:_row(56, cfg.Text)
+	local title = rowTitle(row, cfg.Text or "Input", {Position = UDim2.new(0, 4, 0, 2), Size = UDim2.new(1, -8, 0, 18)})
 	local box = new("TextBox", {
-		Name = "Box", Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = Theme.Inset,
+		Name = "Box", Position = UDim2.new(0, 0, 0, 22), Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = Theme.Inset,
 		BorderSizePixel = 0, Text = e.Value, PlaceholderText = cfg.Placeholder or "", PlaceholderColor3 = Theme.Dim,
-		TextColor3 = Theme.Text, TextSize = 16, Font = FONT, TextXAlignment = LEFT, ClearTextOnFocus = cfg.ClearTextOnFocus == true,
+		TextColor3 = Theme.Text, TextSize = 14, Font = FONT, TextXAlignment = LEFT, ClearTextOnFocus = cfg.ClearTextOnFocus == true,
 	}, row)
-	corner(box, 10)
+	corner(box, 8)
 	hairline(box, 0.9)
-	new("UIPadding", {PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12)}, box)
+	new("UIPadding", {PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10)}, box)
 
 	local ignore = false
 	box:GetPropertyChangedSignal("Text"):Connect(function()
@@ -1098,7 +1098,7 @@ function Groupbox:AddDropdown(idx, cfg)
 	idx, cfg = splitArgs(idx, cfg)
 	local e = newElement(idx, "Dropdown")
 	e.Callback = cfg.Callback
-	local ROW, GAP, HEAD = 34, 2, 72
+	local ROW, GAP, HEAD = 28, 2, 56
 	local maxVisible = cfg.MaxVisibleDropdownItems or 6
 	local multi = cfg.Multi == true
 	local searchable = cfg.Searchable == true
@@ -1186,20 +1186,20 @@ function Groupbox:AddDropdown(idx, cfg)
 	end
 
 	local row = self:_row(HEAD, cfg.Text, "Frame", {ClipsDescendants = true})
-	local title = rowTitle(row, cfg.Text or "Dropdown", {Position = UDim2.new(0, 4, 0, 4), Size = UDim2.new(1, -8, 0, 22)})
+	local title = rowTitle(row, cfg.Text or "Dropdown", {Position = UDim2.new(0, 4, 0, 2), Size = UDim2.new(1, -8, 0, 18)})
 	local box = new("Frame", {
-		Name = "Box", Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Theme.Inset, BorderSizePixel = 0,
+		Name = "Box", Position = UDim2.new(0, 0, 0, 22), Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Theme.Inset, BorderSizePixel = 0,
 	}, row)
-	corner(box, 10)
+	corner(box, 8)
 	local boxStroke = hairline(box, 0.9)
 	local valueLabel = label(box, {
-		Name = "Value", Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(1, -48, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd,
+		Name = "Value", TextSize = 14, Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -40, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	local arrow = label(box, {
-		Name = "Arrow", Text = "▼", TextSize = 11, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
-		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -24, 0.5, 0), Size = UDim2.fromOffset(18, 18),
+		Name = "Arrow", Text = "▼", TextSize = 10, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -20, 0.5, 0), Size = UDim2.fromOffset(16, 16),
 	})
-	local hit = hitButton(row, {Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 0, 40)})
+	local hit = hitButton(row, {Position = UDim2.new(0, 0, 0, 22), Size = UDim2.new(1, 0, 0, 30)})
 
 	local list = new("ScrollingFrame", {
 		Name = "List", Position = UDim2.new(0, 0, 0, HEAD + 4), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = Theme.Inset,
@@ -1214,8 +1214,8 @@ function Groupbox:AddDropdown(idx, cfg)
 	local searchBox = nil
 	if searchable then
 		searchBox = new("TextBox", {
-			Name = "Search", LayoutOrder = 0, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Theme.Card, BorderSizePixel = 0,
-			Text = "", PlaceholderText = "Search...", PlaceholderColor3 = Theme.Dim, TextColor3 = Theme.Text, TextSize = 15,
+			Name = "Search", LayoutOrder = 0, Size = UDim2.new(1, 0, 0, 26), BackgroundColor3 = Theme.Card, BorderSizePixel = 0,
+			Text = "", PlaceholderText = "Search...", PlaceholderColor3 = Theme.Dim, TextColor3 = Theme.Text, TextSize = 14,
 			Font = FONT, TextXAlignment = LEFT, ClearTextOnFocus = false, ZIndex = 4,
 		}, list)
 		corner(searchBox, 8)
@@ -1229,7 +1229,7 @@ function Groupbox:AddDropdown(idx, cfg)
 			h = h + n * (ROW + GAP) - GAP
 		end
 		if searchable then
-			h = h + 30 + GAP
+			h = h + 26 + GAP
 		end
 		return h
 	end
@@ -1300,13 +1300,13 @@ function Groupbox:AddDropdown(idx, cfg)
 		for i, v in ipairs(values) do
 			local b = new("TextButton", {
 				Name = v, LayoutOrder = i, Size = UDim2.new(1, 0, 0, ROW), BackgroundColor3 = WHITE, BackgroundTransparency = 1,
-				BorderSizePixel = 0, AutoButtonColor = false, Text = display(v), TextSize = 16, Font = FONT, TextColor3 = Theme.Text,
+				BorderSizePixel = 0, AutoButtonColor = false, Text = display(v), TextSize = 14, Font = FONT, TextColor3 = Theme.Text,
 				TextXAlignment = LEFT, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 4,
 			}, list)
 			corner(b, 8)
-			new("UIPadding", {PaddingLeft = UDim.new(0, 12)}, b)
+			new("UIPadding", {PaddingLeft = UDim.new(0, 10)}, b)
 			local dot = new("Frame", {
-				Name = "Dot", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(8, 8),
+				Name = "Dot", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(6, 6),
 				BorderSizePixel = 0, Visible = false, ZIndex = 5,
 			}, b)
 			corner(dot, UDim.new(1, 0))
@@ -1482,14 +1482,14 @@ function Groupbox:AddKeybind(idx, cfg)
 	e.Value = key
 	e.Mode = mode
 
-	local row = self:_row(44, cfg.Text)
-	local title = rowTitle(row, cfg.Text or "Keybind", {Size = UDim2.new(1, -130, 1, 0)})
+	local row = self:_row(34, cfg.Text)
+	local title = rowTitle(row, cfg.Text or "Keybind", {Size = UDim2.new(1, -110, 1, 0)})
 	local btn = new("TextButton", {
-		Name = "Hit", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -4, 0.5, 0), Size = UDim2.fromOffset(110, 32),
-		BackgroundColor3 = Theme.Inset, BorderSizePixel = 0, Text = key, TextColor3 = Theme.Text, TextSize = 15, Font = FONT,
+		Name = "Hit", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -4, 0.5, 0), Size = UDim2.fromOffset(96, 24),
+		BackgroundColor3 = Theme.Inset, BorderSizePixel = 0, Text = key, TextColor3 = Theme.Text, TextSize = 13, Font = FONT,
 		AutoButtonColor = false, ZIndex = 5,
 	}, row)
-	corner(btn, 10)
+	corner(btn, 8)
 	hairline(btn, 0.9)
 	hoverFx(btn, row)
 
@@ -1601,21 +1601,21 @@ function Tab:AddGroupbox(cfg)
 		Name = "Groupbox", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = Theme.Card, BorderSizePixel = 0, LayoutOrder = #self.Groupboxes + 1,
 	}, column)
-	corner(card, 16)
+	corner(card, 14)
 	hairline(card, 0.92)
 	new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, card)
 
-	local head = new("Frame", {Name = "Header", Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1, LayoutOrder = 0}, card)
+	local head = new("Frame", {Name = "Header", Size = UDim2.new(1, 0, 0, 38), BackgroundTransparency = 1, LayoutOrder = 0}, card)
 	label(head, {
-		Name = "Title", Text = cfg.Name or "Groupbox", Font = FONT_BOLD, TextSize = 19,
-		Position = UDim2.new(0, 18, 0, 0), Size = UDim2.new(1, -60, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd,
+		Name = "Title", Text = cfg.Name or "Groupbox", Font = FONT_BOLD, TextSize = 16,
+		Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(1, -48, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	local chevron = label(head, {
-		Name = "Chevron", Text = "▼", TextSize = 11, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
-		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -24, 0.5, 0), Size = UDim2.fromOffset(18, 18),
+		Name = "Chevron", Text = "▼", TextSize = 10, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -20, 0.5, 0), Size = UDim2.fromOffset(16, 16),
 	})
 	new("Frame", {
-		Name = "Divider", Position = UDim2.new(0, 16, 1, -1), Size = UDim2.new(1, -32, 0, 1),
+		Name = "Divider", Position = UDim2.new(0, 12, 1, -1), Size = UDim2.new(1, -24, 0, 1),
 		BackgroundColor3 = WHITE, BackgroundTransparency = 0.93, BorderSizePixel = 0,
 	}, head)
 	local headHit = new("TextButton", {Name = "Hit", BackgroundTransparency = 1, Text = "", Size = UDim2.fromScale(1, 1), ZIndex = 5, AutoButtonColor = false}, head)
@@ -1624,9 +1624,9 @@ function Tab:AddGroupbox(cfg)
 		Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1,
 	}, card)
 	-- space between the rows of a groupbox (buttons are full-row, so this is the gap you see between them)
-	new("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder}, body)
+	new("UIListLayout", {Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder}, body)
 	new("UIPadding", {
-		PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10),
+		PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 8),
 	}, body)
 
 	local gb = setmetatable({Tab = self, Frame = card, Body = body, Chevron = chevron, _order = 0, _collapsed = false}, Groupbox)
