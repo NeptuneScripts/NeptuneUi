@@ -2064,7 +2064,7 @@ function Library:CreateWindow(cfg)
 	-- header
 	local header = new("Frame", {Name = "Header", Size = UDim2.new(1, 0, 0, 52), BackgroundTransparency = 1}, win)
 	local crumb = new("Frame", {
-		Name = "Breadcrumb", Position = UDim2.new(0, 86, 0, 0), Size = UDim2.new(1, -400, 1, 0), BackgroundTransparency = 1, ClipsDescendants = true,
+		Name = "Breadcrumb", Position = UDim2.new(0, 86, 0, 0), Size = UDim2.new(1, -310, 1, 0), BackgroundTransparency = 1, ClipsDescendants = true,
 	}, header)
 	new("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -2096,7 +2096,7 @@ function Library:CreateWindow(cfg)
 	}, header)
 
 	local search = new("TextBox", {
-		Name = "Search", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -92, 0.5, 0), Size = UDim2.fromOffset(190, 32),
+		Name = "Search", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(190, 32),
 		BackgroundColor3 = Theme.Card, BorderSizePixel = 0, Text = "", PlaceholderText = "Search...", PlaceholderColor3 = Theme.Dim,
 		TextColor3 = Theme.Text, TextSize = 16, Font = FONT, TextXAlignment = LEFT, ClearTextOnFocus = false,
 	}, header)
@@ -2106,30 +2106,6 @@ function Library:CreateWindow(cfg)
 	w._search = search
 	search:GetPropertyChangedSignal("Text"):Connect(function()
 		w:_filter(w.ActiveTab, search.Text)
-	end)
-
-	local function headerButton(name, text, xOffset)
-		local b = new("TextButton", {
-			Name = name, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, xOffset, 0.5, 0), Size = UDim2.fromOffset(28, 28),
-			BackgroundColor3 = Theme.Button, BorderSizePixel = 0, Text = text, TextColor3 = Theme.Dim, TextSize = 20, Font = FONT,
-			AutoButtonColor = false,
-		}, header)
-		corner(b, UDim.new(1, 0))
-		hairline(b, 0.9)
-		local hoverColor = (name == "Close") and Theme.Danger or Theme.Button:Lerp(WHITE, 0.1)
-		b.MouseEnter:Connect(function()
-			tween(b, {BackgroundColor3 = hoverColor, TextColor3 = Theme.Text})
-		end)
-		b.MouseLeave:Connect(function()
-			tween(b, {BackgroundColor3 = Theme.Button, TextColor3 = Theme.Dim})
-		end)
-		return b
-	end
-	headerButton("Close", "×", -16).MouseButton1Click:Connect(function()
-		w:Toggle(false)
-	end)
-	headerButton("Minimize", "–", -52).MouseButton1Click:Connect(function()
-		w:Minimize()
 	end)
 
 	-- content area + footer
