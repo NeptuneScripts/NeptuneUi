@@ -1612,7 +1612,8 @@ function Tab:AddGroupbox(cfg)
 	local body = new("Frame", {
 		Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1,
 	}, card)
-	new("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, body)
+	-- space between the rows of a groupbox (buttons are full-row, so this is the gap you see between them)
+	new("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder}, body)
 	new("UIPadding", {
 		PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10),
 	}, body)
