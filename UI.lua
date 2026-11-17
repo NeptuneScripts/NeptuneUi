@@ -30,14 +30,20 @@
 	Library.ConfigIgnore.SomeIndex = true  -- leave an element out of configs
 
 	WINDOW
-	Window:AddTab(name, icon) -> Tab       icon = asset id (number / "rbxassetid://...") or nil for the placeholder
+	Window:AddTab(name, icon) -> Tab       icon can be:
+	                                         "settings", "user", "zap" ...   a Lucide icon name (see lucide.dev), loaded the same way Obsidian does
+	                                         123456 / "rbxassetid://123456"  a Roblox image (the running account needs permission for it)
+	                                         { "settings", 123456 }          several options, tried in order until one loads
+	                                         nil                             placeholder image
+	                                       If nothing loads, the tab shows its first letter and a warning is printed.
+	Library:GetIcon("name") -> icon table or nil, reason
 	Window:SelectTab(nameOrTab)  Window:SetTitle(text)  Window:SetIconTint(bool)
 	Window:Toggle([visible])  Window:Minimize([state])
 
 	TAB
 	Tab:AddGroupbox({Name=, Side="Left"|"Right", Collapsed=false, DisableCollapsing=false}) -> Groupbox
 	Tab:AddLeftGroupbox(name)  Tab:AddRightGroupbox(name)
-	Tab:SetIcon(icon)  Tab:Rename(name)
+	Tab:SetIcon(icon)  Tab:Rename(name)         (SetIcon takes the same values as AddTab's icon)
 
 	GROUPBOX  (index is optional; with an index the element is reachable via Library.Toggles / Library.Options)
 	Groupbox:AddToggle(idx, {Text=, Default=false, Callback=function(value), Visible=, Disabled=, Risky=})
@@ -65,6 +71,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local ContentProvider = game:GetService("ContentProvider")
 local GuiService = game:GetService("GuiService")
 local HttpService = game:GetService("HttpService")
 
@@ -186,7 +193,7 @@ local function isMove(input)
 	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch
 end
 
--- accepts 123456, "123456", "rbxassetid://123456"; anything else gives the placeholder
+-- accepts 123456, "123456", "rbxassetid://123456", "rbxasset://..."; anything else gives nil
 local function normalizeIcon(icon)
 	if typeof(icon) == "number" then
 		return "rbxassetid://" .. math.floor(icon)
@@ -195,11 +202,11 @@ local function normalizeIcon(icon)
 		if icon:match("^%d+$") then
 			return "rbxassetid://" .. icon
 		end
-		if icon:match("^rbxasset") or icon:match("^https?://") then
+		if icon:match("^rbxasset") then
 			return icon
 		end
 	end
-	return PLACEHOLDER_ICON
+	return nil
 end
 
 -- the accent colour is applied through hooks so Library:SetAccent can recolour everything
@@ -328,6 +335,142 @@ local function tweenHex(layer, color)
 			tween(band, {BackgroundColor3 = color})
 		end
 	end
+end
+
+----------------------------------------------------------------------- tab icons (same approach as Obsidian)
+
+-- Icons by name come from the Lucide set through an icon module (the same one Obsidian loads).
+-- The module downloads its own sprite sheets, so it needs no Roblox asset permissions and no files from your repo.
+local ICON_MODULE_URLS = {
+	"https://raw.githubusercontent.com/notpoiu/Molto/refs/heads/main/source.lua",
+	"https://raw.githubusercontent.com/notpoiu/lucide-roblox-direct/refs/heads/main/source.lua",
+}
+local iconModule = nil
+local iconModuleState = "idle" -- idle | loading | done
+
+local function getIconModule()
+	if iconModuleState == "done" then
+		return iconModule
+	end
+	if iconModuleState == "loading" then
+		while iconModuleState == "loading" do
+			task.wait(0.05)
+		end
+		return iconModule
+	end
+	iconModuleState = "loading"
+	for index, url in ipairs(ICON_MODULE_URLS) do
+		local ok, mod = pcall(function()
+			return loadstring(game:HttpGet(url))()
+		end)
+		if ok and type(mod) == "table" and mod.GetAsset then
+			if index == 1 and mod.SetProvider then
+				pcall(mod.SetProvider, "lucide")
+			end
+			iconModule = mod
+			break
+		end
+	end
+	iconModuleState = "done"
+	return iconModule
+end
+
+-- Library:GetIcon("settings") -> { Url, ImageRectOffset, ImageRectSize, ... } or nil, reason   (may yield the first time)
+function Library:GetIcon(name)
+	local mod = getIconModule()
+	if not mod then
+		return nil, "the icon module could not be loaded (needs HttpGet, loadstring and file functions, e.g. an executor)"
+	end
+	local ok, icon = pcall(mod.GetAsset, name)
+	if ok and icon then
+		return icon
+	end
+	return nil, "unknown icon name '" .. tostring(name) .. "' (names are from lucide.dev)"
+end
+
+-- true unless Roblox reports that a Roblox-hosted image failed to load (e.g. no permission for this account)
+local function imageLoads(logo)
+	local image = logo.Image
+	if not tostring(image):match("^rbxassetid://") then
+		return true
+	end
+	pcall(function()
+		ContentProvider:PreloadAsync({logo})
+	end)
+	local ok, status = pcall(function()
+		return ContentProvider:GetAssetFetchStatus(image)
+	end)
+	if ok and status == Enum.AssetFetchStatus.Failure then
+		return false
+	end
+	return true
+end
+
+local function showImage(logo, url, rectOffset, rectSize)
+	logo.Image = url
+	logo.ImageRectOffset = rectOffset or Vector2.new(0, 0)
+	logo.ImageRectSize = rectSize or Vector2.new(0, 0)
+end
+
+-- icon: nil (placeholder), a Lucide name ("settings"), an asset id / "rbxassetid://...", or a list of those
+-- that are tried in order. If none of them loads, the tab shows its first letter instead.
+local function applyIcon(tab, icon)
+	tab._iconToken = (tab._iconToken or 0) + 1
+	local token = tab._iconToken
+	local logo, glyph = tab.Logo, tab.Glyph
+	glyph.Visible = false
+	logo.Visible = true
+
+	local list = {}
+	if type(icon) == "table" then
+		list = icon
+	elseif icon ~= nil then
+		list = {icon}
+	end
+	if #list == 0 then
+		showImage(logo, PLACEHOLDER_ICON)
+		return
+	end
+	showImage(logo, "")
+
+	task.spawn(function()
+		local lastError = "no usable icon given"
+		for _, candidate in ipairs(list) do
+			if tab._iconToken ~= token or not logo.Parent then
+				return
+			end
+			local asset = normalizeIcon(candidate)
+			if asset then
+				showImage(logo, asset)
+				if imageLoads(logo) then
+					return
+				end
+				lastError = "Roblox could not load " .. asset .. " (this account may not have permission for it)"
+			elseif type(candidate) == "string" then
+				local found, err = Library:GetIcon(candidate)
+				if tab._iconToken ~= token or not logo.Parent then
+					return
+				end
+				if found then
+					showImage(logo, found.Url, found.ImageRectOffset, found.ImageRectSize)
+					if imageLoads(logo) then
+						return
+					end
+					lastError = "the icon sheet for '" .. candidate .. "' could not be loaded"
+				else
+					lastError = err
+				end
+			else
+				lastError = "unsupported icon value: " .. tostring(candidate)
+			end
+		end
+		if tab._iconToken ~= token or not logo.Parent then
+			return
+		end
+		logo.Visible = false
+		glyph.Visible = true
+		warn("[Neptune] icon for tab '" .. tostring(tab.Name) .. "' did not load: " .. tostring(lastError))
+	end)
 end
 
 ----------------------------------------------------------------------- notifications
@@ -1500,7 +1643,7 @@ function Tab:AddRightGroupbox(name)
 end
 
 function Tab:SetIcon(icon)
-	self.Logo.Image = normalizeIcon(icon)
+	applyIcon(self, icon)
 end
 
 function Tab:Rename(newName)
@@ -1510,6 +1653,7 @@ function Tab:Rename(newName)
 	w.TabMap[newName] = self
 	self.Hex.Name = "Tab_" .. newName
 	self.Page.Name = "Page_" .. newName
+	self.Glyph.Text = string.upper(string.sub(newName, 1, 1))
 	if w.ActiveTab == self then
 		w.Subtitle.Text = newName
 	end
@@ -1536,6 +1680,7 @@ function Window:_refreshTabs()
 			logoColor = active and Theme.Accent or Theme.Dim
 		end
 		tween(t.Logo, {ImageColor3 = logoColor}, 0.2)
+		tween(t.Glyph, {TextColor3 = active and Theme.Accent or Theme.Dim}, 0.2)
 	end
 end
 
@@ -1608,8 +1753,14 @@ function Window:AddTab(name, icon)
 	local fill = hexLayer(hex, "Fill", Theme.HexFill, 0.935, 2)
 	local logo = new("ImageLabel", {
 		Name = "Logo", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.42, 0.364),
-		BackgroundTransparency = 1, Image = normalizeIcon(icon), ImageColor3 = Theme.Dim, ScaleType = Enum.ScaleType.Fit, ZIndex = 3,
+		BackgroundTransparency = 1, Image = "", ImageColor3 = Theme.Dim, ScaleType = Enum.ScaleType.Fit, ZIndex = 3,
 	}, hex)
+	-- shown instead of the logo when an icon could not be loaded
+	local glyph = label(hex, {
+		Name = "Glyph", Text = string.upper(string.sub(name, 1, 1)), Font = FONT_BOLD, TextSize = 26, TextColor3 = Theme.Dim,
+		TextXAlignment = CENTER, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.6, 0.6), Visible = false, ZIndex = 3,
+	})
 	local hit = new("TextButton", {Name = "Hit", BackgroundTransparency = 1, Text = "", Size = UDim2.fromScale(1, 1), ZIndex = 4, AutoButtonColor = false}, hex)
 
 	local page = new("ScrollingFrame", {
@@ -1628,11 +1779,12 @@ function Window:AddTab(name, icon)
 	end
 
 	local tab = setmetatable({
-		Window = self, Name = name, Hex = hex, Outline = outline, Fill = fill, Logo = logo, Page = page,
+		Window = self, Name = name, Hex = hex, Outline = outline, Fill = fill, Logo = logo, Glyph = glyph, Page = page,
 		Left = makeColumn("Left", 1), Right = makeColumn("Right", 2), Groupboxes = {}, _next = 1,
 	}, Tab)
 	table.insert(self.Tabs, tab)
 	self.TabMap[name] = tab
+	applyIcon(tab, icon)
 
 	hit.MouseEnter:Connect(function()
 		tween(scale, {Scale = 1.1}, 0.15)
