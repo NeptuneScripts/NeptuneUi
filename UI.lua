@@ -1,3 +1,85 @@
+--[[
+	=====================  NEPTUNE UI LIBRARY  =====================
+
+	The whole UI is real instances in the explorer (StarterGui.NeptuneUI), so you can restyle
+	anything by hand. This module only adds behaviour on top of those instances.
+
+	HOW IT IS ORGANISED
+		Main            window root (Size, Position; attributes: Accent, ToggleKey, IconTint)
+		  Window        the rounded window  ->  Header (Breadcrumb/Title, Search, buttons) + Content (pages)
+		  Tabs          the hexagon tabs (attributes: Side, ColumnA, ColumnB, StartY, Pitch)
+		Templates       invisible copies of every element; the Add* functions clone these,
+		                so editing a template restyles everything created from it
+		Notifications   where toasts appear
+
+	Every bindable object carries the attribute NeptuneType (Tab, Section, Toggle, Slider,
+	Dropdown, Input, Keybind, Button, Label). You can duplicate any of them in the explorer and
+	it is picked up automatically at runtime.
+
+	-------------------------------------------------------------
+	QUICK START (LocalScript inside NeptuneUI)
+	-------------------------------------------------------------
+		local Lib = require(script.Parent.NeptuneLib)
+		local Window = Lib.Init(script.Parent, {
+			Title = "My Hub",                       -- header title
+			Accent = Color3.fromRGB(95, 215, 152),  -- accent colour
+			ToggleKey = Enum.KeyCode.RightShift,    -- show / hide the window
+			IconTint = true,                        -- false keeps your icons' own colours
+		})
+
+		local Tab = Window:AddTab("Combat", 123456789)   -- name, icon (asset id or "rbxassetid://...")
+		Tab:AddSection("Aimbot")                          -- cards; elements below go inside the latest card
+		Tab:AddToggle({Name = "Enabled", Default = true, Callback = function(on) end})
+
+	-------------------------------------------------------------
+	WINDOW API  (Window = Lib.Init(gui, config))
+	-------------------------------------------------------------
+	Window:SetTitle(text)                 change the header title
+	Window:SetAccent(color3)              recolours toggles, sliders, hexes, title, toasts ...
+	Window:SetToggleKey(keyCode | name)   key that shows / hides the window
+	Window:SetIconTint(bool)              tint tab icons with the accent (true) or leave them alone (false)
+	Window:Toggle([visible])  Window:Minimize([state])  Window:Destroy()
+	Window:Notify({Title=, Content=, Duration=4, Color=})   toast notification
+	Window:AddTab(name, icon) -> Tab      add a hexagon tab (icon optional)
+	Window:GetTab(name) -> Tab            find an existing tab (including ones built in the explorer)
+	Window:RemoveTab(nameOrTab)           delete a tab and its page
+	Window:SelectTab(nameOrTab)           switch tab from code
+	Window:ExportConfig() -> table        { ["Tab/Element"] = value } for every toggle/slider/dropdown/input/keybind
+	Window:ImportConfig(table)            apply a saved table (callbacks fire)
+	Window:ExportConfigJson() / ImportConfigJson(str)
+
+	-------------------------------------------------------------
+	TAB API
+	-------------------------------------------------------------
+	Tab:SetIcon(icon)                     change the hexagon icon (nil restores the placeholder)
+	Tab:Rename(newName)                   change the tab name (tooltip, page, breadcrumb)
+	Tab.Elements["Name"]                  look up an element on this tab
+	Tab:AddSection(name)                  starts a new collapsible card
+	Tab:AddLabel(text)
+	Tab:AddButton({Name=, Callback=})
+	Tab:AddToggle({Name=, Default=false, Callback=function(value)})
+	Tab:AddSlider({Name=, Min=0, Max=100, Default=, Increment=1, Suffix="", Callback=function(value)})
+	Tab:AddDropdown({Name=, Options={"A","B"}, Default=, Callback=function(choice)})
+	Tab:AddInput({Name=, Placeholder=, Default=, Callback=function(text)})
+	Tab:AddKeybind({Name=, Default="E" | Enum.KeyCode.E, Callback=function(keyName)})
+
+	-------------------------------------------------------------
+	ELEMENT API  (what the Add* functions return)
+	-------------------------------------------------------------
+	el:Set(value, silent)  el:Get()       toggles / sliders / dropdowns / inputs / keybinds
+	el:OnChanged(function(value) end)     returns a connection (el.Changed is the raw signal)
+	el.Callback = function(value) end     alternative to the Callback field in the config
+	el:SetTitle(text)  el:SetVisible(bool)  el:Destroy()
+	dropdown:SetOptions({"A","B"}, keepSelection)
+	keybind:OnPressed(function() end)     fires when the bound key is pressed
+	section:SetCollapsed(bool)
+
+	Tips
+		* Element names are the lookup keys, keep them unique per tab.
+		* To mark a Keybind as the window's show/hide key set its attribute MenuKey = true.
+		* Hex layout: edit the Tabs attributes, or just drag the hexagons around in the explorer.
+]]
+
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
@@ -432,24 +514,11 @@ function Lib:_tabPosition(i)
 	return UDim2.new(0, x, 0, y)
 end
 
--- grow the window when there are more hexagons than fit down the side
-function Lib:_fitWindow()
-	local tf = self.TabsFrame
-	local n = #self.Tabs
-	local half = self.Templates.HexTab.Size.Y.Offset / 2
-	local needed = (tf:GetAttribute("StartY") or 66) + math.max(n - 1, 0) * (tf:GetAttribute("Pitch") or 64) + half + 24
-	local cur = self.Main.Size
-	if needed > cur.Y.Offset then
-		self.Main.Size = UDim2.new(cur.X.Scale, cur.X.Offset, 0, math.ceil(needed))
-	end
-end
-
 function Lib:_layoutTabs()
 	for i, t in ipairs(self.Tabs) do
 		t.Hex.LayoutOrder = i
 		t.Hex.Position = self:_tabPosition(i)
 	end
-	self:_fitWindow()
 end
 
 function Lib:_setHex(t, active)
@@ -571,7 +640,6 @@ function Lib:AddTab(name, icon)
 	page.Parent = self.Content
 	local t = self:_bindTab(hex)
 	self:_setHex(t, false)
-	self:_fitWindow()
 	if not self.ActiveTab then self:SelectTab(t) end
 	return t
 end
@@ -708,11 +776,6 @@ function Lib:SetAccent(color)
 		if e._applyAccent then e:_applyAccent() end
 	end
 	for _, t in ipairs(self.Tabs) do self:_setHex(t, t == self.ActiveTab) end
-end
-
-function Lib:SetSize(width, height)
-	self.Main.Size = UDim2.fromOffset(width, height)
-	self:_fitWindow()
 end
 
 function Lib:SetToggleKey(key)
@@ -864,7 +927,7 @@ function Lib:_bindWindow()
 	end)
 end
 
--- Lib.Init(gui, config)   config (all optional): Title, Accent, ToggleKey, Size (Vector2), IconTint
+-- Lib.Init(gui, config)   config (all optional): Title, Accent, ToggleKey, IconTint
 function Lib.Init(gui, cfg)
 	cfg = cfg or {}
 	local self = setmetatable({}, Lib)
@@ -896,11 +959,9 @@ function Lib.Init(gui, cfg)
 	-- apply config
 	if cfg.ToggleKey then self:SetToggleKey(cfg.ToggleKey) end
 	if cfg.IconTint ~= nil then self.IconTint = cfg.IconTint and true or false end
-	if cfg.Size then self:SetSize(cfg.Size.X, cfg.Size.Y) end
 	if cfg.Title then self:SetTitle(cfg.Title) end
 	if cfg.Accent then self:SetAccent(cfg.Accent) end
 
-	self:_fitWindow()
 	self:SelectTab(self.Tabs[1])
 	return self
 end
