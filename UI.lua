@@ -118,7 +118,7 @@ local function enumItem(enumType, name, fallback)
 end
 local FONT = enumItem(Enum.Font, "BuilderSans", Enum.Font.Gotham)
 local FONT_BOLD = enumItem(Enum.Font, "BuilderSansBold", Enum.Font.GothamBold)
-local FONT_LABEL = enumItem(Enum.Font, "BuilderSansExtraBold", FONT_BOLD) -- labels and the loading screen's small text
+local FONT_LABEL = FONT_BOLD -- labels, element titles ("This is a toggle", "This is my slider!") and the loading screen's small text
 local PLACEHOLDER_ICON = "rbxasset://textures/ui/GuiImagePlaceholder.png"
 local WHITE = Color3.new(1, 1, 1)
 
@@ -761,7 +761,7 @@ function Groupbox:_row(height, searchText, class, props)
 end
 
 local function rowTitle(row, text, props)
-	local p = {Name = "Title", Text = text or "", TextSize = 17, Position = UDim2.new(0, 4, 0, 0), Size = UDim2.new(1, -70, 1, 0)}
+	local p = {Name = "Title", Text = text or "", Font = FONT_LABEL, TextSize = 17, Position = UDim2.new(0, 4, 0, 0), Size = UDim2.new(1, -70, 1, 0)}
 	for k, v in pairs(props or {}) do
 		p[k] = v
 	end
