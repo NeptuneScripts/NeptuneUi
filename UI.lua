@@ -20,6 +20,10 @@
 		NotifySide = "Right",              -- "Left" | "Right"
 		LoadingScreen = true,              -- hide the window behind a loading screen until Window:FinishLoading()
 		                                   -- (or a table: {Title=, Subtitle=, MinTime=1.2, Timeout=25})
+		MobileButton = true,               -- floating hexagon button that opens / closes the window (for phones and tablets):
+		                                   -- true = always, false = never, "Auto" = only on touch devices without a keyboard.
+		                                   -- You can drag it; it follows the accent colour.
+		MobileButtonIcon = "menu",         -- optional: Lucide name / asset id for the button (default "menu")
 	}) -> Window
 
 	Library.Options / Library.Toggles      elements by their index (see below)
@@ -43,6 +47,7 @@
 	Window:Toggle([visible])  Window:Minimize([state])
 	Window:SetLoading("text", 0-1)         update the loading screen's status / progress (optional, yields one frame)
 	Window:FinishLoading()                 close the loading screen and show the window; waits for the minimum time and for tab icons
+	Window:SetMobileButton(true | false | "Auto")   show / hide the floating open / close button
 
 	TAB
 	Tab:AddGroupbox({Name=, Icon=, IconColor=, Collapsed=false, DisableCollapsing=false}) -> Groupbox
@@ -68,6 +73,8 @@
 	Groupbox:AddKeybind(idx, {Text=, Default="E"|Enum.KeyCode.E|"MB2", Mode="Toggle"|"Hold"|"Press"|"Always",
 	                           Callback=function(state), ChangedCallback=function(key)})
 	Groupbox:SetCollapsed(bool)  Groupbox:SetIcon(icon)   (nil removes the icon)
+	Every element except labels and dividers also takes  Icon = "name"  (Lucide name, asset id or a list) and  IconColor = Color3;
+	it is drawn before the element's text. Change it later with element:SetIcon(icon) (nil removes it).
 
 	ELEMENTS
 	el.Value   el:SetValue(v)   el:OnChanged(function(value) end)   el:SetText(t)   el:SetVisible(b)
@@ -694,6 +701,10 @@ local function finishElement(e, row, title, hit, cfg)
 		if title then
 			title.TextTransparency = d and 0.55 or 0
 		end
+		local ic = row:FindFirstChild("Icon", true)
+		if ic then
+			ic.ImageTransparency = d and 0.55 or 0
+		end
 	end
 	function e:Destroy()
 		if self.Idx ~= nil then
@@ -706,7 +717,58 @@ local function finishElement(e, row, title, hit, cfg)
 		end
 		row:Destroy()
 	end
+	-- Icon before the element's text: Lucide name, asset id or a list (same values as tab icons)
+	if title or e.Type == "Button" then
+		local isButton = e.Type == "Button"
+		local img = nil
+		local target = nil
+		local baseTitlePos = title and title.Position
+		local baseTitleSize = title and title.Size
+		local function shiftTitle(shifted)
+			if not title or not title.Parent then
+				return
+			end
+			local d = shifted and 20 or 0
+			title.Position = UDim2.new(baseTitlePos.X.Scale, baseTitlePos.X.Offset + d, baseTitlePos.Y.Scale, baseTitlePos.Y.Offset)
+			title.Size = UDim2.new(baseTitleSize.X.Scale, baseTitleSize.X.Offset - d, baseTitleSize.Y.Scale, baseTitleSize.Y.Offset)
+		end
+		function e:SetIcon(icon)
+			if not img then
+				local pos
+				if isButton then
+					pos = UDim2.new(0, 10, 0.5, 0)
+				elseif title.Size.Y.Scale > 0 then
+					pos = UDim2.new(0, 4, 0.5, 0)
+				else
+					pos = UDim2.new(0, 4, 0, title.Position.Y.Offset + title.Size.Y.Offset / 2)
+				end
+				img = new("ImageLabel", {
+					Name = "Icon", AnchorPoint = Vector2.new(0, 0.5), Position = pos, Size = UDim2.fromOffset(14, 14),
+					BackgroundTransparency = 1, Image = "", ImageColor3 = (cfg and cfg.IconColor) or Theme.Dim,
+					ScaleType = Enum.ScaleType.Fit, Visible = false, ZIndex = 6,
+				}, isButton and hit or row)
+				target = {
+					Logo = img, Window = Library.Window or {_pendingIcons = 0}, Kind = "element",
+					Name = (title and title.Text) or (hit and hit.Text) or "element",
+					_onIconFail = function()
+						shiftTitle(false) -- the icon did not load: give the space back to the text
+					end,
+				}
+			end
+			local hasIcon = icon ~= nil and not (type(icon) == "table" and #icon == 0)
+			shiftTitle(hasIcon)
+			if not hasIcon then
+				target._iconToken = (target._iconToken or 0) + 1
+				img.Visible = false
+				return
+			end
+			applyIcon(target, icon)
+		end
+	end
 	if cfg then
+		if cfg.Icon ~= nil and e.SetIcon then
+			e:SetIcon(cfg.Icon)
+		end
 		if cfg.Visible == false then
 			e:SetVisible(false)
 		end
@@ -1224,7 +1286,7 @@ function Groupbox:AddDropdown(idx, cfg)
 	corner(box, 8)
 	local boxStroke = hairline(box, 0.9)
 	local valueLabel = label(box, {
-		Name = "Value", TextSize = 14, Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -40, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd,
+		Name = "Value", Font = FONT_LABEL, TextSize = 14, Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -40, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	local arrow = label(box, {
 		Name = "Arrow", Text = "▼", TextSize = 10, TextColor3 = Theme.Dim, TextXAlignment = CENTER,
@@ -1247,7 +1309,7 @@ function Groupbox:AddDropdown(idx, cfg)
 		searchBox = new("TextBox", {
 			Name = "Search", LayoutOrder = 0, Size = UDim2.new(1, 0, 0, 26), BackgroundColor3 = Theme.Card, BorderSizePixel = 0,
 			Text = "", PlaceholderText = "Search...", PlaceholderColor3 = Theme.Dim, TextColor3 = Theme.Text, TextSize = 14,
-			Font = FONT, TextXAlignment = LEFT, ClearTextOnFocus = false, ZIndex = 4,
+			Font = FONT_LABEL, TextXAlignment = LEFT, ClearTextOnFocus = false, ZIndex = 4,
 		}, list)
 		corner(searchBox, 8)
 		new("UIPadding", {PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10)}, searchBox)
@@ -1331,7 +1393,7 @@ function Groupbox:AddDropdown(idx, cfg)
 		for i, v in ipairs(values) do
 			local b = new("TextButton", {
 				Name = v, LayoutOrder = i, Size = UDim2.new(1, 0, 0, ROW), BackgroundColor3 = WHITE, BackgroundTransparency = 1,
-				BorderSizePixel = 0, AutoButtonColor = false, Text = display(v), TextSize = 14, Font = FONT, TextColor3 = Theme.Text,
+				BorderSizePixel = 0, AutoButtonColor = false, Text = display(v), TextSize = 14, Font = FONT_LABEL, TextColor3 = Theme.Text,
 				TextXAlignment = LEFT, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 4,
 			}, list)
 			corner(b, 8)
@@ -1878,7 +1940,7 @@ function Window:SetIconTint(state)
 	self:_refreshTabs()
 end
 
-function Window:Toggle(state)
+function Window:_toggle(state)
 	if self._loading then
 		return
 	end
@@ -1903,6 +1965,113 @@ function Window:Toggle(state)
 		end
 		main.Visible = false
 	end
+end
+
+function Window:Toggle(state)
+	self:_toggle(state)
+	self:_refreshMobileButton()
+end
+
+----------------------------------------------------------------------- mobile open / close button
+
+-- state: true (always show), false (never) or "Auto" (only on touch devices without a keyboard)
+local function mobileButtonWanted(state)
+	if type(state) == "string" and string.lower(state) == "auto" then
+		return UserInputService.TouchEnabled == true and UserInputService.KeyboardEnabled ~= true
+	end
+	return state == true
+end
+
+-- recolours the button from the theme and shows / hides it (it stays hidden behind the loading screen)
+function Window:_refreshMobileButton()
+	local m = self._mobile
+	if not m or not m.Frame.Parent then
+		return
+	end
+	m.Frame.Visible = m.Wanted and not self._loading
+	local open = self.Main.Visible == true
+	tweenHex(m.Outline, Theme.Accent)
+	tweenHex(m.Fill, open and Theme.HexFill:Lerp(Theme.Accent, 0.16) or Theme.HexFill)
+	tween(m.Logo, {ImageColor3 = Theme.Accent}, 0.2)
+	tween(m.Glyph, {TextColor3 = Theme.Accent}, 0.2)
+end
+
+function Window:_createMobileButton(icon)
+	local g = self._gui
+	local frame = new("Frame", {
+		Name = "MobileButton", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -44, 0.4, 0),
+		Size = UDim2.fromOffset(56, 65), BackgroundTransparency = 1, ZIndex = 60, Visible = false,
+	}, g)
+	new("UIAspectRatioConstraint", {AspectRatio = 0.866}, frame)
+	local press = new("UIScale", {Name = "Press"}, frame)
+	local outline = hexLayer(frame, "Outline", Theme.Accent, 1, 1)
+	local fill = hexLayer(frame, "Fill", Theme.HexFill, 0.88, 2)
+	local logo = new("ImageLabel", {
+		Name = "Logo", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.42, 0.364),
+		BackgroundTransparency = 1, Image = "", ImageColor3 = Theme.Accent, ScaleType = Enum.ScaleType.Fit, ZIndex = 3,
+	}, frame)
+	local glyph = label(frame, {
+		Name = "Glyph", Text = string.upper(string.sub(self.TitleLabel.Text, 1, 1)), Font = FONT_BOLD, TextSize = 24, TextColor3 = Theme.Accent,
+		TextXAlignment = CENTER, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.6, 0.6), Visible = false, ZIndex = 3,
+	})
+	glyph.Parent = frame
+	local hit = new("TextButton", {Name = "Hit", BackgroundTransparency = 1, Text = "", Size = UDim2.fromScale(1, 1), ZIndex = 5, AutoButtonColor = false}, frame)
+
+	self._mobile = {Frame = frame, Outline = outline, Fill = fill, Logo = logo, Glyph = glyph, Wanted = true}
+	-- the icon loads like a tab icon (Lucide name / asset id / list); the first letter of the title shows if it cannot
+	applyIcon({Logo = logo, Glyph = glyph, Window = self, Name = "mobile button", Kind = "mobile button"}, icon or "menu")
+
+	-- a tap opens / closes the window, dragging moves the button
+	local dragging, moved, startMouse, startCenter = false, false, nil, nil
+	hit.InputBegan:Connect(function(input)
+		if isPress(input) then
+			dragging, moved = true, false
+			startMouse = input.Position
+			startCenter = Vector2.new(frame.AbsolutePosition.X + frame.AbsoluteSize.X / 2, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y / 2)
+			tween(press, {Scale = 0.92}, 0.08)
+		end
+	end)
+	connect(UserInputService.InputChanged, function(input)
+		if not dragging or not isMove(input) then
+			return
+		end
+		local d = input.Position - startMouse
+		if not moved and (d.X * d.X + d.Y * d.Y) > 36 then
+			moved = true
+		end
+		if moved then
+			local vp = g.AbsoluteSize
+			local x = math.clamp(startCenter.X + d.X, 32, math.max(vp.X - 32, 32))
+			local y = math.clamp(startCenter.Y + d.Y, 36, math.max(vp.Y - 36, 36))
+			frame.Position = UDim2.fromScale(x / math.max(vp.X, 1), y / math.max(vp.Y, 1))
+		end
+	end)
+	connect(UserInputService.InputEnded, function(input)
+		if dragging and isPress(input) then
+			dragging = false
+			tween(press, {Scale = 1}, 0.1)
+			if not moved then
+				self:Toggle()
+			end
+		end
+	end)
+
+	onAccent(function()
+		self:_refreshMobileButton()
+	end)
+end
+
+-- Window:SetMobileButton(true | false | "Auto")   the floating hexagon button that opens / closes the window
+function Window:SetMobileButton(state)
+	local wanted = mobileButtonWanted(state)
+	if wanted and not self._mobile then
+		self:_createMobileButton(self._mobileIcon)
+	end
+	if self._mobile then
+		self._mobile.Wanted = wanted
+	end
+	self:_refreshMobileButton()
 end
 
 function Window:Minimize(state)
@@ -2208,6 +2377,13 @@ function Library:CreateWindow(cfg)
 
 	if cfg.LoadingScreen then
 		w:_createLoadingScreen(g, type(cfg.LoadingScreen) == "table" and cfg.LoadingScreen or {}, cfg)
+	end
+
+	-- floating hexagon open / close button (for phones and tablets)
+	w._gui = g
+	w._mobileIcon = cfg.MobileButtonIcon
+	if cfg.MobileButton ~= nil then
+		w:SetMobileButton(cfg.MobileButton)
 	end
 
 	return w
