@@ -73,8 +73,6 @@
 	Groupbox:AddKeybind(idx, {Text=, Default="E"|Enum.KeyCode.E|"MB2", Mode="Toggle"|"Hold"|"Press"|"Always",
 	                           Callback=function(state), ChangedCallback=function(key)})
 	Groupbox:SetCollapsed(bool)  Groupbox:SetIcon(icon)   (nil removes the icon)
-	Every element except labels and dividers also takes  Icon = "name"  (Lucide name, asset id or a list) and  IconColor = Color3;
-	it is drawn before the element's text. Change it later with element:SetIcon(icon) (nil removes it).
 
 	ELEMENTS
 	el.Value   el:SetValue(v)   el:OnChanged(function(value) end)   el:SetText(t)   el:SetVisible(b)
@@ -701,10 +699,6 @@ local function finishElement(e, row, title, hit, cfg)
 		if title then
 			title.TextTransparency = d and 0.55 or 0
 		end
-		local ic = row:FindFirstChild("Icon", true)
-		if ic then
-			ic.ImageTransparency = d and 0.55 or 0
-		end
 	end
 	function e:Destroy()
 		if self.Idx ~= nil then
@@ -717,58 +711,7 @@ local function finishElement(e, row, title, hit, cfg)
 		end
 		row:Destroy()
 	end
-	-- Icon before the element's text: Lucide name, asset id or a list (same values as tab icons)
-	if title or e.Type == "Button" then
-		local isButton = e.Type == "Button"
-		local img = nil
-		local target = nil
-		local baseTitlePos = title and title.Position
-		local baseTitleSize = title and title.Size
-		local function shiftTitle(shifted)
-			if not title or not title.Parent then
-				return
-			end
-			local d = shifted and 20 or 0
-			title.Position = UDim2.new(baseTitlePos.X.Scale, baseTitlePos.X.Offset + d, baseTitlePos.Y.Scale, baseTitlePos.Y.Offset)
-			title.Size = UDim2.new(baseTitleSize.X.Scale, baseTitleSize.X.Offset - d, baseTitleSize.Y.Scale, baseTitleSize.Y.Offset)
-		end
-		function e:SetIcon(icon)
-			if not img then
-				local pos
-				if isButton then
-					pos = UDim2.new(0, 10, 0.5, 0)
-				elseif title.Size.Y.Scale > 0 then
-					pos = UDim2.new(0, 4, 0.5, 0)
-				else
-					pos = UDim2.new(0, 4, 0, title.Position.Y.Offset + title.Size.Y.Offset / 2)
-				end
-				img = new("ImageLabel", {
-					Name = "Icon", AnchorPoint = Vector2.new(0, 0.5), Position = pos, Size = UDim2.fromOffset(14, 14),
-					BackgroundTransparency = 1, Image = "", ImageColor3 = (cfg and cfg.IconColor) or Theme.Dim,
-					ScaleType = Enum.ScaleType.Fit, Visible = false, ZIndex = 6,
-				}, isButton and hit or row)
-				target = {
-					Logo = img, Window = Library.Window or {_pendingIcons = 0}, Kind = "element",
-					Name = (title and title.Text) or (hit and hit.Text) or "element",
-					_onIconFail = function()
-						shiftTitle(false) -- the icon did not load: give the space back to the text
-					end,
-				}
-			end
-			local hasIcon = icon ~= nil and not (type(icon) == "table" and #icon == 0)
-			shiftTitle(hasIcon)
-			if not hasIcon then
-				target._iconToken = (target._iconToken or 0) + 1
-				img.Visible = false
-				return
-			end
-			applyIcon(target, icon)
-		end
-	end
 	if cfg then
-		if cfg.Icon ~= nil and e.SetIcon then
-			e:SetIcon(cfg.Icon)
-		end
 		if cfg.Visible == false then
 			e:SetVisible(false)
 		end
